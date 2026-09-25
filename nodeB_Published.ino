@@ -4,11 +4,11 @@
 #include <avr/wdt.h>
 
 // --- Network Configuration ---
-char ssid[] = "Infinity";
-char pass[] = "qwertyuiop1234567890@...";
+char ssid[] = "";
+char pass[] = "";
 char haAddress[] = "192.168.0.86";
 int haPort = 8123;
-#define HA_TOKEN "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJlNzllZjI0ZWM5MmQ0MmI3OWY5MTE2NGM0ZGQzMjEyOSIsImlhdCI6MTc3NDk3MzM5NywiZXhwIjoyMDkwMzMzMzk3fQ.3TUfHmCGluCOpzGfD_3pogjQe75Fj8PZh6R-Wh7HJAk" 
+#define HA_TOKEN "" 
 
 // ==============================================================================
 // 2. HARDWARE PINS
