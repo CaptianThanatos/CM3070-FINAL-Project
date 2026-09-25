@@ -1,0 +1,319 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+homeassistant:
+  packages: !include_dir_named packages
+  
+automation: !include automations.yaml
+scene: !include scenes.yaml
+script: !include scripts.yaml
+
+
+#>>>>>>>>>>>>>>>>>>>>>>>>>> HTTP / CLOUDFLARE REVERSE PROXY<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 127.0.0.1
+    - "::1"
+
+
+#>>>>>>>>>>>>>>>>>> TEMPLATE ENTITIES<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+template:
+
+  # SENSORS
+
+  - sensor:
+
+      # --------------------------------------------------------
+      # NODE A - PLANT ZONE SENSOR
+      # Raw source:
+      # sensor.node_a_climate
+      # --------------------------------------------------------
+
+      - name: "Plant Zone Temperature"
+        unique_id: "node_a_temperature_sensor"
+        unit_of_measurement: "°C"
+
+        # Temperature is the main state of sensor.node_a_climate
+        state: >
+          {{ states('sensor.node_a_climate') | float(0) }}
+
+        # Do not report 0°C when Node A is actually unavailable
+        availability: >
+          {{ has_value('sensor.node_a_climate') }}
+
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:thermometer
+
+
+      - name: "Plant Zone Humidity"
+        unique_id: "node_a_humidity_sensor"
+        unit_of_measurement: "%"
+
+        # Humidity is stored as an attribute of sensor.node_a_climate
+        state: >
+          {{ state_attr('sensor.node_a_climate', 'humidity') | float(0) }}
+
+        availability: >
+          {{
+            has_value('sensor.node_a_climate')
+            and
+            state_attr('sensor.node_a_climate', 'humidity') is not none
+          }}
+
+        device_class: humidity
+        state_class: measurement
+        icon: mdi:water-percent
+
+
+      - name: "Plant Zone Light"
+        unique_id: "node_a_lux_sensor"
+        unit_of_measurement: "lx"
+
+        # Light level is stored as an attribute of sensor.node_a_climate
+        state: >
+          {{ state_attr('sensor.node_a_climate', 'lux') | float(0) }}
+
+        availability: >
+          {{
+            has_value('sensor.node_a_climate')
+            and
+            state_attr('sensor.node_a_climate', 'lux') is not none
+          }}
+
+        device_class: illuminance
+        state_class: measurement
+        icon: mdi:brightness-5
+
+
+      # NODE B - MOISTURE TELEMETRY
+      #
+      # Raw source expected from Node B:
+      # sensor.node_b_gateway
+      #
+      # These are currently raw Arduino ADC values (0-1023),
+      # NOT calibrated percentages.
+
+      - name: "Node B Moisture 1 Raw"
+        unique_id: "node_b_moisture_1_raw"
+
+        state: >
+          {{ state_attr('sensor.node_b_gateway', 'moisture_1') }}
+
+        availability: >
+          {{
+            states('sensor.node_b_gateway')
+            not in ['unknown', 'unavailable']
+            and
+            state_attr('sensor.node_b_gateway', 'moisture_1') is not none
+          }}
+
+        icon: mdi:water
+
+
+      - name: "Node B Moisture 2 Raw"
+        unique_id: "node_b_moisture_2_raw"
+
+        state: >
+          {{ state_attr('sensor.node_b_gateway', 'moisture_2') }}
+
+        availability: >
+          {{
+            states('sensor.node_b_gateway')
+            not in ['unknown', 'unavailable']
+            and
+            state_attr('sensor.node_b_gateway', 'moisture_2') is not none
+          }}
+
+        icon: mdi:water
+
+
+      - name: "Node B Moisture 3 Raw"
+        unique_id: "node_b_moisture_3_raw"
+
+        state: >
+          {{ state_attr('sensor.node_b_gateway', 'moisture_3') }}
+
+        availability: >
+          {{
+            states('sensor.node_b_gateway')
+            not in ['unknown', 'unavailable']
+            and
+            state_attr('sensor.node_b_gateway', 'moisture_3') is not none
+          }}
+
+        icon: mdi:water
+
+
+      - name: "Node B Moisture 4 Raw"
+        unique_id: "node_b_moisture_4_raw"
+
+        state: >
+          {{ state_attr('sensor.node_b_gateway', 'moisture_4') }}
+
+        availability: >
+          {{
+            states('sensor.node_b_gateway')
+            not in ['unknown', 'unavailable']
+            and
+            state_attr('sensor.node_b_gateway', 'moisture_4') is not none
+          }}
+
+        icon: mdi:water
+
+
+  #>>>>>>>>>>>>>>>>>>>>> BINARY SENSORS<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+  - binary_sensor:
+
+      # NODE A - HEARTBEAT
+      #
+      # Connected when sensor.node_a_climate:
+      #   1. has a valid value
+      #   2. has updated within the last 10 minutes
+
+      - name: "Node A Connection Status"
+        unique_id: "node_a_connection_status"
+        device_class: connectivity
+
+        state: >
+          {% if has_value('sensor.node_a_climate') %}
+            {{
+              (now() - states.sensor.node_a_climate.last_updated)
+              .total_seconds() < 600
+            }}
+          {% else %}
+            false
+          {% endif %}
+
+        icon: >
+          {% if is_state('binary_sensor.node_a_connection_status', 'on') %}
+            mdi:wifi-check
+          {% else %}
+            mdi:wifi-off
+          {% endif %}
+
+      # NDDE B HEARTBEAT
+      - name: "Node B Connection Status"
+        unique_id: "node_b_connection_status"
+        device_class: connectivity
+
+        state: >
+          {% set node = states.sensor.node_b_gateway %}
+          {{
+            node is not none
+            and node.state not in ['unknown', 'unavailable']
+            and (now() - node.last_updated).total_seconds() < 60
+          }}
+
+        icon: >
+          {% if is_state('binary_sensor.node_b_connection_status', 'on') %}
+            mdi:lan-connect
+          {% else %}
+            mdi:lan-disconnect
+          {% endif %}
+
+      # NODE B - PHYSICAL SAFETY INPUTS
+
+      - name: "Node B E-Stop"
+        unique_id: "node_b_e_stop"
+
+        state: >
+          {{
+            state_attr('sensor.node_b_gateway', 'e_stop')
+            | bool(false)
+          }}
+
+        availability: >
+          {{
+            states('sensor.node_b_gateway')
+            not in ['unknown', 'unavailable']
+          }}
+
+        icon: mdi:alert-octagon
+
+
+      - name: "Node B Tank Empty"
+        unique_id: "node_b_tank_empty"
+
+        state: >
+          {{
+            state_attr('sensor.node_b_gateway', 'tank_empty')
+            | bool(false)
+          }}
+
+        availability: >
+          {{
+            states('sensor.node_b_gateway')
+            not in ['unknown', 'unavailable']
+          }}
+
+        icon: mdi:cup-water
+
+
+      - name: "Node B Tank Full"
+        unique_id: "node_b_tank_full"
+
+        state: >
+          {{
+            state_attr('sensor.node_b_gateway', 'tank_full')
+            | bool(false)
+          }}
+
+        availability: >
+          {{
+            states('sensor.node_b_gateway')
+            not in ['unknown', 'unavailable']
+          }}
+
+        icon: mdi:cup-water
+
+
+      # NODE B - DERIVED SAFETY LOCKOUT
+      #
+      # Current safety rule:
+      #
+      # E-STOP active
+      #       OR
+      # Tank Empty
+      #       =
+      # Safety Lockout
+      #
+      # Tank Full is telemetry only and currently does not
+      # trigger the actuator safety lockout.
+
+      - name: "Node B Safety Lockout"
+        unique_id: "node_b_safety_lockout"
+
+        state: >
+          {{
+            (
+              state_attr('sensor.node_b_gateway', 'e_stop')
+              | bool(false)
+            )
+            or
+            (
+              state_attr('sensor.node_b_gateway', 'tank_empty')
+              | bool(false)
+            )
+          }}
+
+        availability: >
+          {{
+            states('sensor.node_b_gateway')
+            not in ['unknown', 'unavailable']
+          }}
+
+        icon: >
+          {% if is_state('binary_sensor.node_b_safety_lockout', 'on') %}
+            mdi:shield-alert
+          {% else %}
+            mdi:shield-check
+          {% endif %}

@@ -1,0 +1,193 @@
+views:
+  - type: sections
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Grow Switch
+            heading_style: title
+          - type: tile
+            entity: sun.sun
+          - type: button
+            entity: switch.grow_light
+          - type: tile
+            entity: sensor.sun_next_rising
+          - type: tile
+            entity: sensor.sun_next_setting
+          - type: tile
+            entity: sensor.plant_zone_temperature
+          - type: tile
+            entity: sensor.plant_zone_humidity
+          - type: tile
+            entity: sensor.plant_zone_light
+          - title: History
+            type: history-graph
+            hours_to_show: 41
+            entities:
+              - sensor.plant_zone_humidity
+      - type: grid
+        cards:
+          - type: heading
+            icon: mdi:water-sync
+            heading: Node B Safety & Status
+            heading_style: title
+          - type: tile
+            entity: binary_sensor.node_b_connection_status
+          - type: tile
+            entity: binary_sensor.node_b_safety_lockout
+          - type: tile
+            entity: binary_sensor.node_b_e_stop
+          - type: tile
+            entity: binary_sensor.node_b_tank_empty
+          - type: tile
+            entity: input_boolean.pump_1_active
+          - type: tile
+            entity: input_boolean.pump_2_active
+          - type: tile
+            grid_options:
+              columns: 6
+              rows: 1
+            entity: script.hush_all_pumps_off
+            vertical: false
+            features_position: bottom
+          - type: tile
+            entity: binary_sensor.node_b_tank_full
+          - type: entities
+            entities:
+              - entity: timer.hush_zone_1_progress_window
+                name: Plant 1 Progress Check
+              - entity: timer.hush_zone_1_continuous_runtime
+                name: Plant 1 Continuous Run Timer
+              - entity: timer.hush_zone_2_progress_window
+                name: Plant 2 Progress Check
+              - entity: timer.hush_zone_2_continuous_runtime
+                name: Plant 2 Continuous Run Timer
+          - type: tile
+            entity: sensor.node_b_moisture_1_raw
+          - type: tile
+            entity: sensor.node_b_moisture_3_raw
+          - type: tile
+            entity: sensor.node_b_moisture_2_raw
+          - type: tile
+            entity: sensor.node_b_moisture_4_raw
+      - type: grid
+        cards:
+          - type: heading
+            heading: Node B Config
+            heading_style: title
+            icon: mdi:cog-box
+          - type: entities
+            title: HUSH Automatic Irrigation
+            show_header_toggle: false
+            entities:
+              - entity: sensor.hush_soil_moisture_1
+                name: Plant 1 Soil Moisture
+                icon: mdi:water-percent
+              - entity: sensor.hush_soil_moisture_2
+                name: Plant 2 Soil Moisture
+                icon: mdi:water-percent
+              - type: divider
+              - entity: input_boolean.hush_zone_1_auto_watering
+                name: Plant 1 Auto Watering
+              - entity: input_boolean.hush_zone_1_watering_demand
+                name: Plant 1 Needs Water
+              - entity: input_boolean.pump_1_active
+                name: Pump 1 Command
+              - entity: input_boolean.hush_zone_1_latched_fault
+                name: Plant 1 Safety Fault
+              - entity: input_text.hush_zone_1_fault_reason
+                name: Plant 1 Fault Reason
+              - entity: script.hush_reset_zone_1_fault
+                name: Reset Plant 1 Fault
+              - type: divider
+              - entity: input_boolean.hush_zone_2_auto_watering
+                name: Plant 2 Auto Watering
+              - entity: input_boolean.hush_zone_2_watering_demand
+                name: Plant 2 Needs Water
+              - entity: input_boolean.pump_2_active
+                name: Pump 2 Command
+              - entity: input_boolean.hush_zone_2_latched_fault
+                name: Plant 2 Safety Fault
+              - entity: input_text.hush_zone_2_fault_reason
+                name: Plant 2 Fault Reason
+              - entity: script.hush_reset_zone_2_fault
+                name: Reset Plant 2 Fault
+              - type: divider
+              - entity: binary_sensor.node_b_connection_status
+                name: Node B Connection
+              - entity: binary_sensor.node_b_tank_empty
+                name: Tank Empty
+              - entity: binary_sensor.node_b_e_stop
+                name: E-Stop
+              - entity: binary_sensor.hush_node_b_water_sensor_fault
+                name: Water Level Sensor Fault
+      - type: grid
+        cards:
+          - type: heading
+            heading: Node B Calibration / Tuning
+            heading_style: title
+            icon: mdi:application-cog-outline
+          - type: entities
+            title: HUSH Irrigation Calibration & Tuning
+            show_header_toggle: false
+            entities:
+              - entity: input_number.hush_moisture_1_dry_raw
+                name: Sensor 1 Dry RAW
+              - entity: input_number.hush_moisture_1_wet_raw
+                name: Sensor 1 Wet RAW
+              - entity: input_number.hush_moisture_2_dry_raw
+                name: Sensor 2 Dry RAW
+              - entity: input_number.hush_moisture_2_wet_raw
+                name: Sensor 2 Wet RAW
+              - type: divider
+              - entity: input_number.hush_zone_1_start_threshold
+                name: Plant 1 Start Watering %
+              - entity: input_number.hush_zone_1_stop_threshold
+                name: Plant 1 Stop Watering %
+              - entity: input_number.hush_zone_1_progress_window_seconds
+                name: Plant 1 Progress Window
+              - entity: input_number.hush_zone_1_min_rise_percent
+                name: Plant 1 Minimum Moisture Rise
+              - entity: input_number.hush_zone_1_failed_windows_limit
+                name: Plant 1 Failed Windows Before Fault
+              - entity: input_number.hush_zone_1_flood_limit_minutes
+                name: Plant 1 Continuous Run Limit
+              - type: divider
+              - entity: input_number.hush_zone_2_start_threshold
+                name: Plant 2 Start Watering %
+              - entity: input_number.hush_zone_2_stop_threshold
+                name: Plant 2 Stop Watering %
+              - entity: input_number.hush_zone_2_progress_window_seconds
+                name: Plant 2 Progress Window
+              - entity: input_number.hush_zone_2_min_rise_percent
+                name: Plant 2 Minimum Moisture Rise
+              - entity: input_number.hush_zone_2_failed_windows_limit
+                name: Plant 2 Failed Windows Before Fault
+              - entity: input_number.hush_zone_2_flood_limit_minutes
+                name: Plant 2 Continuous Run Limit
+      - type: grid
+        cards:
+          - type: heading
+            heading: Levoit Ultrasonic Top-Fill Smart Cool Mist Humidifier
+          - type: tile
+            entity: >-
+              switch.levoit_ultrasonic_top_fill_smart_cool_mist_humidifier_auto_off
+          - type: tile
+            entity: >-
+              switch.levoit_ultrasonic_top_fill_smart_cool_mist_humidifier_display
+          - type: tile
+            entity: humidifier.levoit_ultrasonic_top_fill_smart_cool_mist_humidifier
+          - type: tile
+            entity: >-
+              number.levoit_ultrasonic_top_fill_smart_cool_mist_humidifier_mist_level
+          - type: tile
+            entity: >-
+              select.levoit_ultrasonic_top_fill_smart_cool_mist_humidifier_night_light_level
+          - type: humidifier
+            entity: humidifier.levoit_ultrasonic_top_fill_smart_cool_mist_humidifier
+            features:
+              - type: humidifier-toggle
+    max_columns: 4
+    title: Office No. 1 plant monitoring system
+    icon: mdi:sprout-outline
+    cards: []

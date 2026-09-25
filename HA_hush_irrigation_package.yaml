@@ -1,0 +1,1100 @@
+# HUSH Automatic Irrigation Package
+# Home Assistant package for Node B
+#
+# Current mapping:
+#   Zone 1 -> sensor.node_b_moisture_1_raw -> input_boolean.pump_1_active
+#   Zone 2 -> sensor.node_b_moisture_2_raw -> input_boolean.pump_2_active
+#   Moisture channels 3 and 4 are percentage/monitoring only.
+#
+# Recovery model:
+#   AUTO-RECOVERABLE: tank empty, temporary Node B disconnect, temporary lockout.
+#   LATCHED: E-stop, impossible float state, no moisture response, continuous runtime limit.
+#
+# IMPORTANT: the flood-exposure limiter is CONTINUOUS-RUNTIME ONLY.
+# Any Pump OFF cancels that zone's timer. The next Pump ON starts from zero.
+
+input_boolean:
+  hush_zone_1_auto_watering:
+    name: HUSH Zone 1 Auto Watering
+    icon: mdi:sprinkler-variant
+  hush_zone_2_auto_watering:
+    name: HUSH Zone 2 Auto Watering
+    icon: mdi:sprinkler-variant
+  hush_zone_1_watering_demand:
+    name: HUSH Zone 1 Watering Demand
+    icon: mdi:water-alert
+  hush_zone_2_watering_demand:
+    name: HUSH Zone 2 Watering Demand
+    icon: mdi:water-alert
+  hush_zone_1_latched_fault:
+    name: HUSH Zone 1 Latched Fault
+    icon: mdi:alert-octagon
+  hush_zone_2_latched_fault:
+    name: HUSH Zone 2 Latched Fault
+    icon: mdi:alert-octagon
+
+input_text:
+  hush_zone_1_fault_reason:
+    name: HUSH Zone 1 Fault Reason
+    max: 100
+  hush_zone_2_fault_reason:
+    name: HUSH Zone 2 Fault Reason
+    max: 100
+
+input_number:
+  # Calibration values restore their previous state because "initial" is omitted.
+  hush_moisture_1_dry_raw:
+    name: HUSH Moisture 1 Dry RAW
+    min: 0
+    max: 1023
+    step: 1
+    mode: box
+  hush_moisture_1_wet_raw:
+    name: HUSH Moisture 1 Wet RAW
+    min: 0
+    max: 1023
+    step: 1
+    mode: box
+  hush_moisture_2_dry_raw:
+    name: HUSH Moisture 2 Dry RAW
+    min: 0
+    max: 1023
+    step: 1
+    mode: box
+  hush_moisture_2_wet_raw:
+    name: HUSH Moisture 2 Wet RAW
+    min: 0
+    max: 1023
+    step: 1
+    mode: box
+  hush_moisture_3_dry_raw:
+    name: HUSH Moisture 3 Dry RAW
+    min: 0
+    max: 1023
+    step: 1
+    mode: box
+  hush_moisture_3_wet_raw:
+    name: HUSH Moisture 3 Wet RAW
+    min: 0
+    max: 1023
+    step: 1
+    mode: box
+  hush_moisture_4_dry_raw:
+    name: HUSH Moisture 4 Dry RAW
+    min: 0
+    max: 1023
+    step: 1
+    mode: box
+  hush_moisture_4_wet_raw:
+    name: HUSH Moisture 4 Wet RAW
+    min: 0
+    max: 1023
+    step: 1
+    mode: box
+
+  hush_zone_1_start_threshold:
+    name: HUSH Zone 1 Start Threshold
+    min: 5
+    max: 90
+    step: 1
+    unit_of_measurement: "%"
+    mode: box
+  hush_zone_1_stop_threshold:
+    name: HUSH Zone 1 Stop Threshold
+    min: 10
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    mode: box
+  hush_zone_1_progress_window_seconds:
+    name: HUSH Zone 1 Progress Window
+    min: 30
+    max: 600
+    step: 10
+    unit_of_measurement: s
+    mode: box
+  hush_zone_1_min_rise_percent:
+    name: HUSH Zone 1 Minimum Moisture Rise
+    min: 0.5
+    max: 20
+    step: 0.5
+    unit_of_measurement: "%"
+    mode: box
+  hush_zone_1_failed_windows_limit:
+    name: HUSH Zone 1 Failed Windows Before Fault
+    min: 1
+    max: 10
+    step: 1
+    mode: box
+  hush_zone_1_flood_limit_minutes:
+    name: HUSH Zone 1 Continuous Run Flood Limit
+    min: 1
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: box
+  hush_zone_1_reference_moisture:
+    name: HUSH Zone 1 Reference Moisture
+    min: 0
+    max: 100
+    step: 0.1
+    unit_of_measurement: "%"
+    mode: box
+  hush_zone_1_no_progress_windows:
+    name: HUSH Zone 1 No-Progress Windows
+    min: 0
+    max: 10
+    step: 1
+    mode: box
+
+  hush_zone_2_start_threshold:
+    name: HUSH Zone 2 Start Threshold
+    min: 5
+    max: 90
+    step: 1
+    unit_of_measurement: "%"
+    mode: box
+  hush_zone_2_stop_threshold:
+    name: HUSH Zone 2 Stop Threshold
+    min: 10
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    mode: box
+  hush_zone_2_progress_window_seconds:
+    name: HUSH Zone 2 Progress Window
+    min: 30
+    max: 600
+    step: 10
+    unit_of_measurement: s
+    mode: box
+  hush_zone_2_min_rise_percent:
+    name: HUSH Zone 2 Minimum Moisture Rise
+    min: 0.5
+    max: 20
+    step: 0.5
+    unit_of_measurement: "%"
+    mode: box
+  hush_zone_2_failed_windows_limit:
+    name: HUSH Zone 2 Failed Windows Before Fault
+    min: 1
+    max: 10
+    step: 1
+    mode: box
+  hush_zone_2_flood_limit_minutes:
+    name: HUSH Zone 2 Continuous Run Flood Limit
+    min: 1
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: box
+  hush_zone_2_reference_moisture:
+    name: HUSH Zone 2 Reference Moisture
+    min: 0
+    max: 100
+    step: 0.1
+    unit_of_measurement: "%"
+    mode: box
+  hush_zone_2_no_progress_windows:
+    name: HUSH Zone 2 No-Progress Windows
+    min: 0
+    max: 10
+    step: 1
+    mode: box
+
+timer:
+  hush_zone_1_progress_window:
+    name: HUSH Zone 1 Progress Window Timer
+    duration: "00:01:00"
+    restore: false
+  hush_zone_2_progress_window:
+    name: HUSH Zone 2 Progress Window Timer
+    duration: "00:01:00"
+    restore: false
+  hush_zone_1_continuous_runtime:
+    name: HUSH Zone 1 Continuous Runtime
+    duration: "00:10:00"
+    restore: false
+  hush_zone_2_continuous_runtime:
+    name: HUSH Zone 2 Continuous Runtime
+    duration: "00:10:00"
+    restore: false
+
+template:
+  - sensor:
+      - name: HUSH Soil Moisture 1
+        unique_id: hush_soil_moisture_1
+        unit_of_measurement: "%"
+        icon: mdi:water-percent
+        state: >
+          {% set raw = states('sensor.node_b_moisture_1_raw') | float(none) %}
+          {% set dry = states('input_number.hush_moisture_1_dry_raw') | float(none) %}
+          {% set wet = states('input_number.hush_moisture_1_wet_raw') | float(none) %}
+          {% if raw is none or dry is none or wet is none or ((wet - dry) | abs) < 20 %}
+            {{ none }}
+          {% else %}
+            {% set pct = ((raw - dry) / (wet - dry) * 100) %}
+            {% set bounded = [0, [100, pct] | min] | max %}
+            {{ bounded | round(1) }}
+          {% endif %}
+        attributes:
+          raw: "{{ states('sensor.node_b_moisture_1_raw') }}"
+          dry_raw: "{{ states('input_number.hush_moisture_1_dry_raw') }}"
+          wet_raw: "{{ states('input_number.hush_moisture_1_wet_raw') }}"
+
+      - name: HUSH Soil Moisture 2
+        unique_id: hush_soil_moisture_2
+        unit_of_measurement: "%"
+        icon: mdi:water-percent
+        state: >
+          {% set raw = states('sensor.node_b_moisture_2_raw') | float(none) %}
+          {% set dry = states('input_number.hush_moisture_2_dry_raw') | float(none) %}
+          {% set wet = states('input_number.hush_moisture_2_wet_raw') | float(none) %}
+          {% if raw is none or dry is none or wet is none or ((wet - dry) | abs) < 20 %}
+            {{ none }}
+          {% else %}
+            {% set pct = ((raw - dry) / (wet - dry) * 100) %}
+            {% set bounded = [0, [100, pct] | min] | max %}
+            {{ bounded | round(1) }}
+          {% endif %}
+        attributes:
+          raw: "{{ states('sensor.node_b_moisture_2_raw') }}"
+          dry_raw: "{{ states('input_number.hush_moisture_2_dry_raw') }}"
+          wet_raw: "{{ states('input_number.hush_moisture_2_wet_raw') }}"
+
+      - name: HUSH Soil Moisture 3
+        unique_id: hush_soil_moisture_3
+        unit_of_measurement: "%"
+        icon: mdi:water-percent
+        state: >
+          {% set raw = states('sensor.node_b_moisture_3_raw') | float(none) %}
+          {% set dry = states('input_number.hush_moisture_3_dry_raw') | float(none) %}
+          {% set wet = states('input_number.hush_moisture_3_wet_raw') | float(none) %}
+          {% if raw is none or dry is none or wet is none or ((wet - dry) | abs) < 20 %}
+            {{ none }}
+          {% else %}
+            {% set pct = ((raw - dry) / (wet - dry) * 100) %}
+            {% set bounded = [0, [100, pct] | min] | max %}
+            {{ bounded | round(1) }}
+          {% endif %}
+        attributes:
+          raw: "{{ states('sensor.node_b_moisture_3_raw') }}"
+          dry_raw: "{{ states('input_number.hush_moisture_3_dry_raw') }}"
+          wet_raw: "{{ states('input_number.hush_moisture_3_wet_raw') }}"
+
+      - name: HUSH Soil Moisture 4
+        unique_id: hush_soil_moisture_4
+        unit_of_measurement: "%"
+        icon: mdi:water-percent
+        state: >
+          {% set raw = states('sensor.node_b_moisture_4_raw') | float(none) %}
+          {% set dry = states('input_number.hush_moisture_4_dry_raw') | float(none) %}
+          {% set wet = states('input_number.hush_moisture_4_wet_raw') | float(none) %}
+          {% if raw is none or dry is none or wet is none or ((wet - dry) | abs) < 20 %}
+            {{ none }}
+          {% else %}
+            {% set pct = ((raw - dry) / (wet - dry) * 100) %}
+            {% set bounded = [0, [100, pct] | min] | max %}
+            {{ bounded | round(1) }}
+          {% endif %}
+        attributes:
+          raw: "{{ states('sensor.node_b_moisture_4_raw') }}"
+          dry_raw: "{{ states('input_number.hush_moisture_4_dry_raw') }}"
+          wet_raw: "{{ states('input_number.hush_moisture_4_wet_raw') }}"
+
+  - binary_sensor:
+      - name: HUSH Node B Water Sensor Fault
+        unique_id: hush_node_b_water_sensor_fault
+        device_class: problem
+        state: >
+          {{ state_attr('sensor.node_b_gateway', 'water_sensor_fault') | bool(false) }}
+
+script:
+  hush_initialize_irrigation_defaults:
+    alias: HUSH - Initialize Irrigation Defaults
+    icon: mdi:tune
+    mode: single
+    sequence:
+      - action: input_number.set_value
+        target:
+          entity_id:
+            - input_number.hush_zone_1_start_threshold
+            - input_number.hush_zone_2_start_threshold
+        data:
+          value: 35
+      - action: input_number.set_value
+        target:
+          entity_id:
+            - input_number.hush_zone_1_stop_threshold
+            - input_number.hush_zone_2_stop_threshold
+        data:
+          value: 45
+      - action: input_number.set_value
+        target:
+          entity_id:
+            - input_number.hush_zone_1_progress_window_seconds
+            - input_number.hush_zone_2_progress_window_seconds
+        data:
+          value: 60
+      - action: input_number.set_value
+        target:
+          entity_id:
+            - input_number.hush_zone_1_min_rise_percent
+            - input_number.hush_zone_2_min_rise_percent
+        data:
+          value: 2
+      - action: input_number.set_value
+        target:
+          entity_id:
+            - input_number.hush_zone_1_failed_windows_limit
+            - input_number.hush_zone_2_failed_windows_limit
+        data:
+          value: 2
+      - action: input_number.set_value
+        target:
+          entity_id:
+            - input_number.hush_zone_1_flood_limit_minutes
+            - input_number.hush_zone_2_flood_limit_minutes
+        data:
+          value: 10
+      - action: input_number.set_value
+        target:
+          entity_id:
+            - input_number.hush_zone_1_no_progress_windows
+            - input_number.hush_zone_2_no_progress_windows
+        data:
+          value: 0
+      - action: persistent_notification.create
+        data:
+          title: HUSH Irrigation Defaults Loaded
+          message: >
+            Starting policy values loaded. Auto-watering remains OFF.
+            Calibrate Dry RAW and Wet RAW before enabling either zone.
+
+  hush_reconcile_zone_1:
+    alias: HUSH - Reconcile Zone 1 Watering
+    mode: restart
+    sequence:
+      - variables:
+          moisture: "{{ states('sensor.hush_soil_moisture_1') | float(none) }}"
+          start_threshold: "{{ states('input_number.hush_zone_1_start_threshold') | float(35) }}"
+          stop_threshold: "{{ states('input_number.hush_zone_1_stop_threshold') | float(45) }}"
+          auto_enabled: "{{ is_state('input_boolean.hush_zone_1_auto_watering', 'on') }}"
+          latched_fault: "{{ is_state('input_boolean.hush_zone_1_latched_fault', 'on') }}"
+          physical_safe: >
+            {{
+              is_state('binary_sensor.node_b_connection_status', 'on')
+              and is_state('binary_sensor.node_b_tank_empty', 'off')
+              and is_state('binary_sensor.node_b_e_stop', 'off')
+              and is_state('binary_sensor.hush_node_b_water_sensor_fault', 'off')
+              and is_state('binary_sensor.node_b_safety_lockout', 'off')
+            }}
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ not auto_enabled }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id:
+                    - input_boolean.hush_zone_1_watering_demand
+                    - input_boolean.pump_1_active
+              - stop: Zone 1 auto-watering disabled
+          - conditions:
+              - condition: template
+                value_template: "{{ moisture is none }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.pump_1_active
+              - stop: Zone 1 moisture unavailable
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: >
+                  {{ is_state('input_boolean.hush_zone_1_watering_demand','off')
+                     and moisture <= start_threshold }}
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.hush_zone_1_watering_demand
+          - conditions:
+              - condition: template
+                value_template: >
+                  {{ is_state('input_boolean.hush_zone_1_watering_demand','on')
+                     and moisture >= stop_threshold }}
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id:
+                    - input_boolean.hush_zone_1_watering_demand
+                    - input_boolean.pump_1_active
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: >
+                  {{ is_state('input_boolean.hush_zone_1_watering_demand','on')
+                     and not latched_fault and physical_safe }}
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.pump_1_active
+        default:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.pump_1_active
+
+  hush_reconcile_zone_2:
+    alias: HUSH - Reconcile Zone 2 Watering
+    mode: restart
+    sequence:
+      - variables:
+          moisture: "{{ states('sensor.hush_soil_moisture_2') | float(none) }}"
+          start_threshold: "{{ states('input_number.hush_zone_2_start_threshold') | float(35) }}"
+          stop_threshold: "{{ states('input_number.hush_zone_2_stop_threshold') | float(45) }}"
+          auto_enabled: "{{ is_state('input_boolean.hush_zone_2_auto_watering', 'on') }}"
+          latched_fault: "{{ is_state('input_boolean.hush_zone_2_latched_fault', 'on') }}"
+          physical_safe: >
+            {{
+              is_state('binary_sensor.node_b_connection_status', 'on')
+              and is_state('binary_sensor.node_b_tank_empty', 'off')
+              and is_state('binary_sensor.node_b_e_stop', 'off')
+              and is_state('binary_sensor.hush_node_b_water_sensor_fault', 'off')
+              and is_state('binary_sensor.node_b_safety_lockout', 'off')
+            }}
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ not auto_enabled }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id:
+                    - input_boolean.hush_zone_2_watering_demand
+                    - input_boolean.pump_2_active
+              - stop: Zone 2 auto-watering disabled
+          - conditions:
+              - condition: template
+                value_template: "{{ moisture is none }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.pump_2_active
+              - stop: Zone 2 moisture unavailable
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: >
+                  {{ is_state('input_boolean.hush_zone_2_watering_demand','off')
+                     and moisture <= start_threshold }}
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.hush_zone_2_watering_demand
+          - conditions:
+              - condition: template
+                value_template: >
+                  {{ is_state('input_boolean.hush_zone_2_watering_demand','on')
+                     and moisture >= stop_threshold }}
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id:
+                    - input_boolean.hush_zone_2_watering_demand
+                    - input_boolean.pump_2_active
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: >
+                  {{ is_state('input_boolean.hush_zone_2_watering_demand','on')
+                     and not latched_fault and physical_safe }}
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.pump_2_active
+        default:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.pump_2_active
+
+  hush_reset_zone_1_fault:
+    alias: HUSH - Reset Zone 1 Latched Fault
+    icon: mdi:lock-reset
+    mode: single
+    sequence:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.node_b_e_stop
+                state: "off"
+              - condition: state
+                entity_id: binary_sensor.hush_node_b_water_sensor_fault
+                state: "off"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.hush_zone_1_latched_fault
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.hush_zone_1_fault_reason
+                data:
+                  value: Clear
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.hush_zone_1_no_progress_windows
+                data:
+                  value: 0
+              - action: script.hush_reconcile_zone_1
+        default:
+          - action: persistent_notification.create
+            data:
+              title: HUSH Zone 1 Reset Rejected
+              message: Correct E-stop/water-sensor fault before resetting the latch.
+
+  hush_reset_zone_2_fault:
+    alias: HUSH - Reset Zone 2 Latched Fault
+    icon: mdi:lock-reset
+    mode: single
+    sequence:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.node_b_e_stop
+                state: "off"
+              - condition: state
+                entity_id: binary_sensor.hush_node_b_water_sensor_fault
+                state: "off"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.hush_zone_2_latched_fault
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.hush_zone_2_fault_reason
+                data:
+                  value: Clear
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.hush_zone_2_no_progress_windows
+                data:
+                  value: 0
+              - action: script.hush_reconcile_zone_2
+        default:
+          - action: persistent_notification.create
+            data:
+              title: HUSH Zone 2 Reset Rejected
+              message: Correct E-stop/water-sensor fault before resetting the latch.
+
+automation:
+  - id: hush_irrigation_reconcile
+    alias: HUSH - Automatic Irrigation Reconcile
+    mode: restart
+    triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: state
+        entity_id:
+          - sensor.hush_soil_moisture_1
+          - sensor.hush_soil_moisture_2
+          - input_boolean.hush_zone_1_auto_watering
+          - input_boolean.hush_zone_2_auto_watering
+          - input_boolean.hush_zone_1_latched_fault
+          - input_boolean.hush_zone_2_latched_fault
+          - input_number.hush_zone_1_start_threshold
+          - input_number.hush_zone_1_stop_threshold
+          - input_number.hush_zone_2_start_threshold
+          - input_number.hush_zone_2_stop_threshold
+          - binary_sensor.node_b_connection_status
+          - binary_sensor.node_b_tank_empty
+          - binary_sensor.node_b_e_stop
+          - binary_sensor.hush_node_b_water_sensor_fault
+          - binary_sensor.node_b_safety_lockout
+      - trigger: time_pattern
+        seconds: "/30"
+    actions:
+      - action: script.hush_reconcile_zone_1
+      - action: script.hush_reconcile_zone_2
+
+  - id: hush_latch_critical_physical_fault
+    alias: HUSH - Latch Critical Physical Fault
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.node_b_e_stop
+        to: "on"
+        id: estop
+      - trigger: state
+        entity_id: binary_sensor.hush_node_b_water_sensor_fault
+        to: "on"
+        id: water_sensor_fault
+    variables:
+      reason: >
+        {% if trigger.id == 'estop' %}E_STOP{% else %}WATER_SENSOR_FAULT{% endif %}
+    actions:
+      - action: input_boolean.turn_on
+        target:
+          entity_id:
+            - input_boolean.hush_zone_1_latched_fault
+            - input_boolean.hush_zone_2_latched_fault
+      - action: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.pump_1_active
+            - input_boolean.pump_2_active
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.hush_zone_1_fault_reason
+        data:
+          value: "{{ reason }}"
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.hush_zone_2_fault_reason
+        data:
+          value: "{{ reason }}"
+      - action: persistent_notification.create
+        data:
+          notification_id: hush_critical_physical_fault
+          title: HUSH Critical Safety Fault
+          message: >
+            {{ reason }} triggered. Both pumps are OFF and automatic restart is latched.
+            Correct the physical condition, then reset the fault.
+
+  - id: hush_zone_1_pump_started
+    alias: HUSH - Zone 1 Pump Started
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.pump_1_active
+        to: "on"
+    variables:
+      moisture: "{{ states('sensor.hush_soil_moisture_1') | float(none) }}"
+      progress_seconds: "{{ states('input_number.hush_zone_1_progress_window_seconds') | int(60) }}"
+      flood_seconds: "{{ (states('input_number.hush_zone_1_flood_limit_minutes') | float(10) * 60) | int }}"
+      progress_duration: >
+        {{ '%02d:%02d:%02d' | format(progress_seconds // 3600, (progress_seconds % 3600) // 60, progress_seconds % 60) }}
+      flood_duration: >
+        {{ '%02d:%02d:%02d' | format(flood_seconds // 3600, (flood_seconds % 3600) // 60, flood_seconds % 60) }}
+    actions:
+      - action: timer.start
+        target:
+          entity_id: timer.hush_zone_1_continuous_runtime
+        data:
+          duration: "{{ flood_duration }}"
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.hush_zone_1_auto_watering
+                state: "on"
+              - condition: state
+                entity_id: input_boolean.hush_zone_1_watering_demand
+                state: "on"
+              - condition: template
+                value_template: "{{ moisture is not none }}"
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.hush_zone_1_reference_moisture
+                data:
+                  value: "{{ moisture }}"
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.hush_zone_1_no_progress_windows
+                data:
+                  value: 0
+              - action: timer.start
+                target:
+                  entity_id: timer.hush_zone_1_progress_window
+                data:
+                  duration: "{{ progress_duration }}"
+
+  - id: hush_zone_2_pump_started
+    alias: HUSH - Zone 2 Pump Started
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.pump_2_active
+        to: "on"
+    variables:
+      moisture: "{{ states('sensor.hush_soil_moisture_2') | float(none) }}"
+      progress_seconds: "{{ states('input_number.hush_zone_2_progress_window_seconds') | int(60) }}"
+      flood_seconds: "{{ (states('input_number.hush_zone_2_flood_limit_minutes') | float(10) * 60) | int }}"
+      progress_duration: >
+        {{ '%02d:%02d:%02d' | format(progress_seconds // 3600, (progress_seconds % 3600) // 60, progress_seconds % 60) }}
+      flood_duration: >
+        {{ '%02d:%02d:%02d' | format(flood_seconds // 3600, (flood_seconds % 3600) // 60, flood_seconds % 60) }}
+    actions:
+      - action: timer.start
+        target:
+          entity_id: timer.hush_zone_2_continuous_runtime
+        data:
+          duration: "{{ flood_duration }}"
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.hush_zone_2_auto_watering
+                state: "on"
+              - condition: state
+                entity_id: input_boolean.hush_zone_2_watering_demand
+                state: "on"
+              - condition: template
+                value_template: "{{ moisture is not none }}"
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.hush_zone_2_reference_moisture
+                data:
+                  value: "{{ moisture }}"
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.hush_zone_2_no_progress_windows
+                data:
+                  value: 0
+              - action: timer.start
+                target:
+                  entity_id: timer.hush_zone_2_progress_window
+                data:
+                  duration: "{{ progress_duration }}"
+
+  # Any Pump OFF cancels the flood timer. Therefore the limiter measures only
+  # one uninterrupted ON interval; it never accumulates runtime across pauses.
+  - id: hush_zone_1_pump_stopped
+    alias: HUSH - Zone 1 Pump Stopped
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.pump_1_active
+        to: "off"
+    actions:
+      - action: timer.cancel
+        target:
+          entity_id:
+            - timer.hush_zone_1_progress_window
+            - timer.hush_zone_1_continuous_runtime
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.hush_zone_1_no_progress_windows
+        data:
+          value: 0
+
+  - id: hush_zone_2_pump_stopped
+    alias: HUSH - Zone 2 Pump Stopped
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.pump_2_active
+        to: "off"
+    actions:
+      - action: timer.cancel
+        target:
+          entity_id:
+            - timer.hush_zone_2_progress_window
+            - timer.hush_zone_2_continuous_runtime
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.hush_zone_2_no_progress_windows
+        data:
+          value: 0
+
+  - id: hush_zone_1_progress_check
+    alias: HUSH - Zone 1 Watering Progress Check
+    mode: single
+    triggers:
+      - trigger: event
+        event_type: timer.finished
+        event_data:
+          entity_id: timer.hush_zone_1_progress_window
+    conditions:
+      - condition: state
+        entity_id: input_boolean.pump_1_active
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.hush_zone_1_auto_watering
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.hush_zone_1_watering_demand
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.hush_zone_1_latched_fault
+        state: "off"
+    variables:
+      current: "{{ states('sensor.hush_soil_moisture_1') | float(none) }}"
+      reference: "{{ states('input_number.hush_zone_1_reference_moisture') | float(0) }}"
+      stop_threshold: "{{ states('input_number.hush_zone_1_stop_threshold') | float(45) }}"
+      min_rise: "{{ states('input_number.hush_zone_1_min_rise_percent') | float(2) }}"
+      failures: "{{ states('input_number.hush_zone_1_no_progress_windows') | int(0) }}"
+      failure_limit: "{{ states('input_number.hush_zone_1_failed_windows_limit') | int(2) }}"
+      progress_seconds: "{{ states('input_number.hush_zone_1_progress_window_seconds') | int(60) }}"
+      progress_duration: >
+        {{ '%02d:%02d:%02d' | format(progress_seconds // 3600, (progress_seconds % 3600) // 60, progress_seconds % 60) }}
+    actions:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ current is none }}"
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.hush_zone_1_latched_fault
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.hush_zone_1_fault_reason
+                data:
+                  value: MOISTURE_SENSOR_UNAVAILABLE
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.pump_1_active
+              - action: persistent_notification.create
+                data:
+                  notification_id: hush_zone_1_feedback_lost
+                  title: HUSH Zone 1 Feedback Lost
+                  message: Valid soil-moisture feedback disappeared while watering. Pump stopped; manual inspection required.
+          - conditions:
+              - condition: template
+                value_template: "{{ current >= stop_threshold }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id:
+                    - input_boolean.hush_zone_1_watering_demand
+                    - input_boolean.pump_1_active
+          - conditions:
+              - condition: template
+                value_template: "{{ (current - reference) >= min_rise }}"
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.hush_zone_1_reference_moisture
+                data:
+                  value: "{{ current }}"
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.hush_zone_1_no_progress_windows
+                data:
+                  value: 0
+              - action: timer.start
+                target:
+                  entity_id: timer.hush_zone_1_progress_window
+                data:
+                  duration: "{{ progress_duration }}"
+        default:
+          - variables:
+              new_failures: "{{ failures + 1 }}"
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ new_failures >= failure_limit }}"
+                sequence:
+                  - action: input_boolean.turn_on
+                    target:
+                      entity_id: input_boolean.hush_zone_1_latched_fault
+                  - action: input_text.set_value
+                    target:
+                      entity_id: input_text.hush_zone_1_fault_reason
+                    data:
+                      value: WATERING_NO_RESPONSE
+                  - action: input_boolean.turn_off
+                    target:
+                      entity_id: input_boolean.pump_1_active
+                  - action: persistent_notification.create
+                    data:
+                      notification_id: hush_zone_1_no_response
+                      title: HUSH Zone 1 Watering Fault
+                      message: >
+                        Pump 1 was commanded ON but soil moisture failed to show the configured
+                        cumulative rise across the allowed observation windows. Manual inspection required.
+            default:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.hush_zone_1_no_progress_windows
+                data:
+                  value: "{{ new_failures }}"
+              # Keep the original reference so slow cumulative improvement can pass.
+              - action: timer.start
+                target:
+                  entity_id: timer.hush_zone_1_progress_window
+                data:
+                  duration: "{{ progress_duration }}"
+
+  - id: hush_zone_2_progress_check
+    alias: HUSH - Zone 2 Watering Progress Check
+    mode: single
+    triggers:
+      - trigger: event
+        event_type: timer.finished
+        event_data:
+          entity_id: timer.hush_zone_2_progress_window
+    conditions:
+      - condition: state
+        entity_id: input_boolean.pump_2_active
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.hush_zone_2_auto_watering
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.hush_zone_2_watering_demand
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.hush_zone_2_latched_fault
+        state: "off"
+    variables:
+      current: "{{ states('sensor.hush_soil_moisture_2') | float(none) }}"
+      reference: "{{ states('input_number.hush_zone_2_reference_moisture') | float(0) }}"
+      stop_threshold: "{{ states('input_number.hush_zone_2_stop_threshold') | float(45) }}"
+      min_rise: "{{ states('input_number.hush_zone_2_min_rise_percent') | float(2) }}"
+      failures: "{{ states('input_number.hush_zone_2_no_progress_windows') | int(0) }}"
+      failure_limit: "{{ states('input_number.hush_zone_2_failed_windows_limit') | int(2) }}"
+      progress_seconds: "{{ states('input_number.hush_zone_2_progress_window_seconds') | int(60) }}"
+      progress_duration: >
+        {{ '%02d:%02d:%02d' | format(progress_seconds // 3600, (progress_seconds % 3600) // 60, progress_seconds % 60) }}
+    actions:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ current is none }}"
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.hush_zone_2_latched_fault
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.hush_zone_2_fault_reason
+                data:
+                  value: MOISTURE_SENSOR_UNAVAILABLE
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.pump_2_active
+              - action: persistent_notification.create
+                data:
+                  notification_id: hush_zone_2_feedback_lost
+                  title: HUSH Zone 2 Feedback Lost
+                  message: Valid soil-moisture feedback disappeared while watering. Pump stopped; manual inspection required.
+          - conditions:
+              - condition: template
+                value_template: "{{ current >= stop_threshold }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id:
+                    - input_boolean.hush_zone_2_watering_demand
+                    - input_boolean.pump_2_active
+          - conditions:
+              - condition: template
+                value_template: "{{ (current - reference) >= min_rise }}"
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.hush_zone_2_reference_moisture
+                data:
+                  value: "{{ current }}"
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.hush_zone_2_no_progress_windows
+                data:
+                  value: 0
+              - action: timer.start
+                target:
+                  entity_id: timer.hush_zone_2_progress_window
+                data:
+                  duration: "{{ progress_duration }}"
+        default:
+          - variables:
+              new_failures: "{{ failures + 1 }}"
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ new_failures >= failure_limit }}"
+                sequence:
+                  - action: input_boolean.turn_on
+                    target:
+                      entity_id: input_boolean.hush_zone_2_latched_fault
+                  - action: input_text.set_value
+                    target:
+                      entity_id: input_text.hush_zone_2_fault_reason
+                    data:
+                      value: WATERING_NO_RESPONSE
+                  - action: input_boolean.turn_off
+                    target:
+                      entity_id: input_boolean.pump_2_active
+                  - action: persistent_notification.create
+                    data:
+                      notification_id: hush_zone_2_no_response
+                      title: HUSH Zone 2 Watering Fault
+                      message: >
+                        Pump 2 was commanded ON but soil moisture failed to show the configured
+                        cumulative rise across the allowed observation windows. Manual inspection required.
+            default:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.hush_zone_2_no_progress_windows
+                data:
+                  value: "{{ new_failures }}"
+              - action: timer.start
+                target:
+                  entity_id: timer.hush_zone_2_progress_window
+                data:
+                  duration: "{{ progress_duration }}"
+
+  # CONTINUOUS runtime only: timer must finish while pump command is still ON.
+  - id: hush_zone_1_continuous_runtime_limit
+    alias: HUSH - Zone 1 Continuous Runtime Flood Limiter
+    mode: single
+    triggers:
+      - trigger: event
+        event_type: timer.finished
+        event_data:
+          entity_id: timer.hush_zone_1_continuous_runtime
+    conditions:
+      - condition: state
+        entity_id: input_boolean.pump_1_active
+        state: "on"
+    actions:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.hush_zone_1_latched_fault
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.hush_zone_1_fault_reason
+        data:
+          value: CONTINUOUS_RUNTIME_LIMIT
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.pump_1_active
+      - action: persistent_notification.create
+        data:
+          notification_id: hush_zone_1_runtime_limit
+          title: HUSH Zone 1 Flood Exposure Limiter
+          message: >
+            Pump 1 remained continuously ON for the configured maximum continuous runtime.
+            It was stopped and latched for manual inspection.
+
+  - id: hush_zone_2_continuous_runtime_limit
+    alias: HUSH - Zone 2 Continuous Runtime Flood Limiter
+    mode: single
+    triggers:
+      - trigger: event
+        event_type: timer.finished
+        event_data:
+          entity_id: timer.hush_zone_2_continuous_runtime
+    conditions:
+      - condition: state
+        entity_id: input_boolean.pump_2_active
+        state: "on"
+    actions:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.hush_zone_2_latched_fault
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.hush_zone_2_fault_reason
+        data:
+          value: CONTINUOUS_RUNTIME_LIMIT
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.pump_2_active
+      - action: persistent_notification.create
+        data:
+          notification_id: hush_zone_2_runtime_limit
+          title: HUSH Zone 2 Flood Exposure Limiter
+          message: >
+            Pump 2 remained continuously ON for the configured maximum continuous runtime.
+            It was stopped and latched for manual inspection.
