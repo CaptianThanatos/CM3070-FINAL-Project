@@ -10,9 +10,9 @@ char haAddress[] = "192.168.0.86";
 int haPort = 8123;
 #define HA_TOKEN "" 
 
-// ==============================================================================
-// 2. HARDWARE PINS
-// ==============================================================================
+ 
+// >>>>>>>>>>>>2. HARDWARE PINS<<<<<<<<<<<<<<
+ 
 SoftwareSerial esp8266(2, 3);   // Arduino RX=D2 <- ESP TX, Arduino TX=D3 -> ESP RX
 WiFiEspClient client;
 int status = WL_IDLE_STATUS;
@@ -30,9 +30,9 @@ const int SENSOR_PINS[4] = {A0, A1, A2, A3};
 const uint8_t RELAY_ON  = LOW;
 const uint8_t RELAY_OFF = HIGH;
 
-// ==============================================================================
-// 3. SYSTEM STATE
-// ==============================================================================
+ 
+// >>>>>>>>>>>>3. SYSTEM STATE >>>>>>>>>>>>
+ 
 bool eStopTriggered   = false;
 bool bottomRaised     = false;
 bool topRaised        = false;
@@ -53,9 +53,9 @@ int moistureLevels[4] = {0, 0, 0, 0};
 const unsigned long NETWORK_REBOOT_TIMEOUT = 120000UL;
 unsigned long lastSuccessTime = 0;
 
-// ==============================================================================
-// 4. BASIC SAFETY HELPERS
-// ==============================================================================
+ 
+//  >>>>>>>>>>>>4. BASIC SAFETY HELPERS<<<<<<<<<<<
+ 
 void allPumpsOff() {
   for (int i = 0; i < 4; i++) {
     digitalWrite(RELAY_PINS[i], RELAY_OFF);
@@ -135,9 +135,9 @@ void safeDelay(unsigned long durationMs) {
   }
 }
 
-// ==============================================================================
-// 5. SMALL HTTP HELPERS
-// ==============================================================================
+ 
+// >>>>>>>>>>>>5. SMALL HTTP HELPERS<<<<<<<<<<<
+ 
 
 // Read only the first HTTP response line and return its status code.
 // Example: "HTTP/1.1 200 OK" -> 200
@@ -297,9 +297,9 @@ void sendHaBearerToken() {
   client.print(F("\r\n"));
 }
 
-// ==============================================================================
-// 6. POLL HOME ASSISTANT FOR PUMP COMMAND
-// ==============================================================================
+ 
+// >>>>>>>>>>>> 6. POLL HOME ASSISTANT FOR PUMP COMMAND <<<<<<<<<<
+ 
 bool checkPumpCommandFromHA(int pumpNumber) {
   // Never accept a remote ON request if the physical layer is unsafe.
   if (!updateSafetyState()) {
@@ -354,9 +354,9 @@ bool checkPumpCommandFromHA(int pumpNumber) {
   return pumpShouldBeOn;
 }
 
-// ==============================================================================
-// 7. TELEMETRY PUSH
-// ==============================================================================
+ 
+// >>>>>>>>>>>> 7. TELEMETRY PUSH <<<<<<<<<<
+ 
 bool pushTelemetry() {
   updateSafetyState();
   wdt_reset();
@@ -484,9 +484,9 @@ bool pushTelemetry() {
   return success;
 }
 
-// ==============================================================================
-// 8. SETUP
-// ==============================================================================
+ 
+// >>>>>>>>>>>> 8. SETUP <<<<<<<<<<
+ 
 void setup() {
   // Prevent watchdog-reset loops after an AVR WDT reset.
   MCUSR = 0;
@@ -546,20 +546,20 @@ void setup() {
   wdt_reset();
 }
 
-// ==============================================================================
-// 9. MAIN LOOP
-// ==============================================================================
+ 
+// >>>>>>>>>>>>9. MAIN LOOP <<<<<<<<<
+ 
 void loop() {
   wdt_reset();
 
-  // ---------------------------------------------------------------------------
+   
   // STEP 1: PHYSICAL SAFETY FIRST
-  // ---------------------------------------------------------------------------
+   
   updateSafetyState();
 
-  // ---------------------------------------------------------------------------
+   
   // STEP 2: NETWORK-HEALTH SELF-RECOVERY
-  // ---------------------------------------------------------------------------
+   
   if (millis() - lastSuccessTime > NETWORK_REBOOT_TIMEOUT) {
     Serial.println(F("CRITICAL: No successful HA telemetry for 120s."));
     Serial.println(F("Forcing pumps OFF and rebooting Node B..."));
@@ -572,9 +572,9 @@ void loop() {
     while (true) {}
   }
 
-  // ---------------------------------------------------------------------------
+   
   // STEP 3: READ MOISTURE SENSORS
-  // ---------------------------------------------------------------------------
+   
   Serial.println(F("--- Moisture Sensor Readings ---"));
 
   for (int i = 0; i < 4; i++) {
@@ -586,9 +586,9 @@ void loop() {
     Serial.println(moistureLevels[i]);
   }
 
-  // ---------------------------------------------------------------------------
+   
   // STEP 4: SAFETY DEBUG
-  // ---------------------------------------------------------------------------
+   
   Serial.println(F("--- Water Level / Safety Status ---"));
 
   Serial.print(F("Bottom Float RAW: "));
@@ -624,9 +624,9 @@ void loop() {
   Serial.print(F("Alarm Reason: "));
   Serial.println(alarmReason);
 
-  // ---------------------------------------------------------------------------
+   
   // STEP 5: HOME ASSISTANT POLICY EXECUTION
-  // ---------------------------------------------------------------------------
+   
   if (isSystemSafe) {
     // Current project uses Pump 1 and Pump 2.
     for (int pump = 1; pump <= 2; pump++) {
@@ -660,9 +660,9 @@ void loop() {
     allPumpsOff();
   }
 
-  // ---------------------------------------------------------------------------
+   
   // STEP 6: TELEMETRY
-  // ---------------------------------------------------------------------------
+   
   updateSafetyState();
 
   Serial.println(F("Building and pushing telemetry..."));
@@ -680,9 +680,9 @@ void loop() {
     );
   }
 
-  // ---------------------------------------------------------------------------
+   
   // STEP 7: SAFE STANDBY
-  // ---------------------------------------------------------------------------
+   
   Serial.println(F("Entering safe standby (10s)..."));
 
   // Unlike delay(10000), this continues checking E-stop and floats.
